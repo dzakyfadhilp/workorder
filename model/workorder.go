@@ -1,7 +1,18 @@
 package model
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
+// Generic request wrapper untuk semua function
+type GenericRequest struct {
+	Function  string          `json:"function"`
+	Payload   json.RawMessage `json:"payload"`
+	RequestID string          `json:"-"` // Generated server-side
+}
+
+// Specific payload untuk ff_updateWorkorder
 type WorkorderRequest struct {
 	Req  RequestData  `json:"req"`
 	Res  ResponseData `json:"res"`
@@ -42,9 +53,11 @@ type ResponseData struct {
 	Message string      `json:"message"`
 }
 
+// Standard API Response dengan RequestID
 type APIResponse struct {
-	Success bool        `json:"success"`
-	Message string      `json:"message"`
-	Data    interface{} `json:"data,omitempty"`
-	Error   string      `json:"error,omitempty"`
+	RequestID string      `json:"requestId"`
+	Success   bool        `json:"success"`
+	Message   string      `json:"message"`
+	Data      interface{} `json:"data,omitempty"`
+	Error     string      `json:"error,omitempty"`
 }

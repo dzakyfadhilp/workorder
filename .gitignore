@@ -28,4 +28,4 @@ go.work
 *.swo
 *~
 
-README.MD
+docs

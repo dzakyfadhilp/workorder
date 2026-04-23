@@ -1,0 +1,38 @@
+{
+  "function": "ff_updateWorkorder",
+  "payload": {
+    "req": {
+      "memo": "",
+      "task": "updateTaskStatus",
+      "wolo1": "",
+      "wolo3": "",
+      "wonum": "WO051897228",
+      "siteid": "REG-6",
+      "status": "STARTWA",
+      "latitude": "",
+      "cpe_model": "",
+      "errorcode": "",
+      "longitude": "",
+      "task_name": "",
+      "cpe_vendor": "",
+      "labor_scmt": "23000036",
+      "statusiface": "0",
+      "urlevidence": "",
+      "engineermemo": "",
+      "suberrorcode": "",
+      "np_statusmemo": "",
+      "cpe_serial_number": "",
+      "tk_custom_header_03": "23000036",
+      "tk_custom_header_04": "23000036",
+      "tk_custom_header_09": "",
+      "tk_custom_header_10": "TELKOMAKSES-LENSA"
+    },
+    "res": {
+      "data": "WO051897228",
+      "errors": null,
+      "status": true,
+      "message": "Success update status STARTWA"
+    },
+    "date": "2026-04-23T02:35:23.723931Z"
+  }
+}

@@ -16,7 +16,7 @@ func NewWorkorderRepository(db *sql.DB) *WorkorderRepository {
 	return &WorkorderRepository{db: db}
 }
 
-func (r *WorkorderRepository) UpsertWorkorder(req *model.WorkorderRequest) error {
+func (r *WorkorderRepository) UpsertWorkorder(req *model.WorkorderRequest, requestID string) error {
 	rawPayload, err := json.Marshal(req)
 	if err != nil {
 		return fmt.Errorf("failed to marshal payload: %w", err)
@@ -24,7 +24,7 @@ func (r *WorkorderRepository) UpsertWorkorder(req *model.WorkorderRequest) error
 
 	query := `
 		INSERT INTO workorder_updates (
-			wonum, siteid, status, task, memo, wolo1, wolo3,
+			request_id, wonum, siteid, status, task, memo, wolo1, wolo3,
 			latitude, longitude, cpe_model, cpe_vendor, cpe_serial_number,
 			errorcode, suberrorcode, labor_scmt, statusiface,
 			urlevidence, engineermemo, np_statusmemo, task_name,
@@ -32,10 +32,11 @@ func (r *WorkorderRepository) UpsertWorkorder(req *model.WorkorderRequest) error
 			response_data, response_message, raw_payload, received_at, updated_at
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
-			$17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29
+			$17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30
 		)
 		ON CONFLICT (wonum, siteid) 
 		DO UPDATE SET
+			request_id = EXCLUDED.request_id,
 			status = EXCLUDED.status,
 			task = EXCLUDED.task,
 			memo = EXCLUDED.memo,
@@ -65,6 +66,7 @@ func (r *WorkorderRepository) UpsertWorkorder(req *model.WorkorderRequest) error
 	`
 
 	_, err = r.db.Exec(query,
+		requestID,
 		req.Req.Wonum,
 		req.Req.Siteid,
 		req.Req.Status,

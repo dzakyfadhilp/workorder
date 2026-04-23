@@ -6,7 +6,6 @@ import (
 	"os"
 	"workorder-api/config"
 	"workorder-api/handler"
-	"workorder-api/middleware"
 	"workorder-api/repository"
 
 	"github.com/gorilla/mux"
@@ -25,18 +24,23 @@ func main() {
 	}
 	defer db.Close()
 
-	repo := repository.NewWorkorderRepository(db)
-	workorderHandler := handler.NewWorkorderHandler(repo)
+	// Initialize repositories
+	workorderRepo := repository.NewWorkorderRepository(db)
+
+	// Initialize dispatcher handler
+	dispatcher := handler.NewDispatcherHandler(workorderRepo)
 
 	r := mux.NewRouter()
-	r.Use(middleware.Logger)
 
-	r.HandleFunc("/api/workorder/update", workorderHandler.UpdateWorkorder).Methods("POST")
+	// Main endpoint - dispatcher akan route berdasarkan function name
+	r.HandleFunc("/api/execute", dispatcher.HandleRequest).Methods("POST")
 	r.HandleFunc("/health", healthCheck).Methods("GET")
 
 	port := getEnv("PORT", "8080")
 	log.Printf("Server starting on port %s", port)
-	
+	log.Println("Available functions:")
+	log.Println("  - ff_updateWorkorder")
+
 	if err := http.ListenAndServe(":"+port, r); err != nil {
 		log.Fatalf("Server failed to start: %v", err)
 	}

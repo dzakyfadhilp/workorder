@@ -4,6 +4,9 @@
 CREATE TABLE IF NOT EXISTS workorder_updates (
     id BIGSERIAL PRIMARY KEY,
     
+    -- Request tracking
+    request_id VARCHAR(100) NOT NULL,
+    
     -- Required fields (indexed for fast lookup)
     wonum VARCHAR(50) NOT NULL,
     siteid VARCHAR(50) NOT NULL,
@@ -46,6 +49,7 @@ CREATE TABLE IF NOT EXISTS workorder_updates (
 );
 
 -- Indexes for performance
+CREATE INDEX idx_request_id ON workorder_updates(request_id);
 CREATE INDEX idx_wonum ON workorder_updates(wonum);
 CREATE INDEX idx_siteid ON workorder_updates(siteid);
 CREATE INDEX idx_status ON workorder_updates(status);
@@ -54,6 +58,7 @@ CREATE INDEX idx_raw_payload ON workorder_updates USING GIN (raw_payload);
 
 -- Comments for documentation
 COMMENT ON TABLE workorder_updates IS 'Stores workorder status updates with full audit trail';
+COMMENT ON COLUMN workorder_updates.request_id IS 'Unique request ID for tracking';
 COMMENT ON COLUMN workorder_updates.wonum IS 'Work order number - primary business key';
 COMMENT ON COLUMN workorder_updates.siteid IS 'Site identifier - part of composite key';
 COMMENT ON COLUMN workorder_updates.raw_payload IS 'Complete JSON payload for audit purposes';
