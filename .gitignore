@@ -5,6 +5,7 @@
 *.so
 *.dylib
 workorder-api
+main
 
 # Test binary
 *.test
@@ -27,5 +28,11 @@ go.work
 *.swp
 *.swo
 *~
+
+# Docker
+*.log
+
+# Backup files
+backup_*.sql
 
 docs

@@ -4,8 +4,11 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"workorder-api/config"
 	"workorder-api/handler"
+	"workorder-api/queue"
 	"workorder-api/repository"
 
 	"github.com/gorilla/mux"
@@ -18,17 +21,44 @@ func main() {
 		log.Println("No .env file found, using system environment variables")
 	}
 
+	// Initialize database
 	db, err := config.InitDB()
 	if err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 	defer db.Close()
 
+	// Initialize RabbitMQ
+	rabbitConn, err := config.InitRabbitMQ()
+	if err != nil {
+		log.Fatalf("Failed to initialize RabbitMQ: %v", err)
+	}
+	defer rabbitConn.Close()
+
+	// Initialize publisher
+	publisher, err := queue.NewPublisher(rabbitConn)
+	if err != nil {
+		log.Fatalf("Failed to create publisher: %v", err)
+	}
+	defer publisher.Close()
+
 	// Initialize repositories
 	workorderRepo := repository.NewWorkorderRepository(db)
 
+	// Initialize consumer (background worker)
+	consumer, err := queue.NewConsumer(rabbitConn, workorderRepo)
+	if err != nil {
+		log.Fatalf("Failed to create consumer: %v", err)
+	}
+	defer consumer.Close()
+
+	// Start consumer
+	if err := consumer.Start(); err != nil {
+		log.Fatalf("Failed to start consumer: %v", err)
+	}
+
 	// Initialize dispatcher handler
-	dispatcher := handler.NewDispatcherHandler(workorderRepo)
+	dispatcher := handler.NewDispatcherHandler(publisher)
 
 	r := mux.NewRouter()
 
@@ -40,10 +70,21 @@ func main() {
 	log.Printf("Server starting on port %s", port)
 	log.Println("Available functions:")
 	log.Println("  - ff_updateWorkorder")
+	log.Println("Mode: Async processing with RabbitMQ")
 
-	if err := http.ListenAndServe(":"+port, r); err != nil {
-		log.Fatalf("Server failed to start: %v", err)
-	}
+	// Graceful shutdown
+	go func() {
+		if err := http.ListenAndServe(":"+port, r); err != nil {
+			log.Fatalf("Server failed to start: %v", err)
+		}
+	}()
+
+	// Wait for interrupt signal
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	log.Println("Shutting down server...")
 }
 
 func healthCheck(w http.ResponseWriter, r *http.Request) {

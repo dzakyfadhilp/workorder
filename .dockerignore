@@ -1,0 +1,30 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+docs/
+
+# Environment
+.env
+.env.example
+
+# Test files
+test_*.json
+test_*.sh
+
+# IDE
+.vscode/
+.idea/
+
+# Build artifacts
+main
+*.exe
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

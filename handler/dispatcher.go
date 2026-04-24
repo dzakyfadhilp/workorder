@@ -4,18 +4,19 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 	"workorder-api/model"
-	"workorder-api/repository"
+	"workorder-api/queue"
 	"workorder-api/utils"
 )
 
 type DispatcherHandler struct {
-	workorderRepo *repository.WorkorderRepository
+	publisher *queue.Publisher
 }
 
-func NewDispatcherHandler(workorderRepo *repository.WorkorderRepository) *DispatcherHandler {
+func NewDispatcherHandler(publisher *queue.Publisher) *DispatcherHandler {
 	return &DispatcherHandler{
-		workorderRepo: workorderRepo,
+		publisher: publisher,
 	}
 }
 
@@ -36,69 +37,48 @@ func (h *DispatcherHandler) HandleRequest(w http.ResponseWriter, r *http.Request
 	genericReq.RequestID = requestID
 	log.Printf("[%s] INFO: Received function: %s", requestID, genericReq.Function)
 
-	// Route ke handler berdasarkan function name
-	switch genericReq.Function {
-	case "ff_updateWorkorder":
-		h.handleUpdateWorkorder(w, &genericReq)
-	default:
+	// Validate function name
+	if !isValidFunction(genericReq.Function) {
 		log.Printf("[%s] WARN: Unknown function: %s", requestID, genericReq.Function)
 		respondError(w, requestID, http.StatusBadRequest, "Unknown function: "+genericReq.Function)
-	}
-}
-
-// Handler untuk ff_updateWorkorder
-func (h *DispatcherHandler) handleUpdateWorkorder(w http.ResponseWriter, genericReq *model.GenericRequest) {
-	var payload model.WorkorderRequest
-	if err := json.Unmarshal(genericReq.Payload, &payload); err != nil {
-		log.Printf("[%s] ERROR: Failed to parse ff_updateWorkorder payload: %v", genericReq.RequestID, err)
-		respondError(w, genericReq.RequestID, http.StatusBadRequest, "Invalid payload for ff_updateWorkorder")
 		return
 	}
 
-	// Validasi
-	if err := validateWorkorderRequest(&payload); err != nil {
-		log.Printf("[%s] WARN: Validation failed: %v", genericReq.RequestID, err)
-		respondError(w, genericReq.RequestID, http.StatusBadRequest, err.Error())
+	// Publish to queue (async processing)
+	msg := &queue.Message{
+		RequestID: requestID,
+		Function:  genericReq.Function,
+		Payload:   genericReq.Payload,
+		Timestamp: time.Now(),
+	}
+
+	if err := h.publisher.Publish(msg); err != nil {
+		log.Printf("[%s] ERROR: Failed to publish message: %v", requestID, err)
+		respondError(w, requestID, http.StatusInternalServerError, "Failed to queue request")
 		return
 	}
 
-	// Save ke table workorder_updates
-	if err := h.workorderRepo.UpsertWorkorder(&payload, genericReq.RequestID); err != nil {
-		log.Printf("[%s] ERROR: Failed to save workorder: %v", genericReq.RequestID, err)
-		respondError(w, genericReq.RequestID, http.StatusInternalServerError, "Failed to save workorder")
-		return
-	}
-
-	log.Printf("[%s] INFO: Workorder updated successfully - wonum: %s, status: %s", 
-		genericReq.RequestID, payload.Req.Wonum, payload.Req.Status)
-
+	// Return immediate response (202 Accepted)
 	response := model.APIResponse{
-		RequestID: genericReq.RequestID,
+		RequestID: requestID,
 		Success:   true,
-		Message:   "Workorder updated successfully",
-		Data: map[string]string{
-			"function": "ff_updateWorkorder",
-			"wonum":    payload.Req.Wonum,
-			"status":   payload.Req.Status,
-			"siteid":   payload.Req.Siteid,
+		Message:   "Request accepted and queued for processing",
+		Data: map[string]interface{}{
+			"function": genericReq.Function,
+			"status":   "queued",
 		},
 	}
 
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(http.StatusAccepted) // 202 Accepted
 	json.NewEncoder(w).Encode(response)
 }
 
-func validateWorkorderRequest(req *model.WorkorderRequest) error {
-	if req.Req.Wonum == "" {
-		return &ValidationError{Field: "wonum", Message: "wonum is required"}
+func isValidFunction(function string) bool {
+	validFunctions := map[string]bool{
+		"ff_updateWorkorder": true,
+		// Tambahkan function lain di sini
 	}
-	if req.Req.Status == "" {
-		return &ValidationError{Field: "status", Message: "status is required"}
-	}
-	if req.Req.Siteid == "" {
-		return &ValidationError{Field: "siteid", Message: "siteid is required"}
-	}
-	return nil
+	return validFunctions[function]
 }
 
 func respondError(w http.ResponseWriter, requestID string, code int, message string) {
@@ -110,13 +90,4 @@ func respondError(w http.ResponseWriter, requestID string, code int, message str
 	}
 	w.WriteHeader(code)
 	json.NewEncoder(w).Encode(response)
-}
-
-type ValidationError struct {
-	Field   string
-	Message string
-}
-
-func (e *ValidationError) Error() string {
-	return e.Message
 }
